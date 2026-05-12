@@ -1,4 +1,4 @@
-# Discreet Code Typing Tool
+# Discreet Code Typing Practice
 
 A professional, minimal terminal-based typing practice app designed for developers. It mimics the "Monkeytype" experience while maintaining a subdued, work-safe aesthetic within Windows Terminal or PowerShell.
 
