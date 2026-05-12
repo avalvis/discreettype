@@ -5,7 +5,7 @@
         "title": "Hello World",
         "code": "def main():\n    print(\"Hello, World!\")\n\nif __name__ == \"__main__\":\n    main()",
         "difficulty": "easy",
-        "tags": ["basics"]
+        "tags": ["basics", "algorithms"]
     },
     {
         "id": "py-list-comp",
@@ -13,7 +13,7 @@
         "title": "List Comprehension",
         "code": "numbers = [1, 2, 3, 4, 5]\nsquares = [n**2 for n in numbers if n % 2 == 0]\nprint(squares)",
         "difficulty": "easy",
-        "tags": ["basics", "comprehension"]
+        "tags": ["basics", "comprehension", "python"]
     },
     {
         "id": "ts-interface",
@@ -21,6 +21,22 @@
         "title": "User Interface",
         "code": "interface User {\n    id: number;\n    username: string;\n    email: string;\n}\n\nconst getUser = (id: number): User => {\n    return { id, username: \"dev\", email: \"dev@example.com\" };\n};",
         "difficulty": "medium",
-        "tags": ["interfaces", "types"]
+        "tags": ["types", "frontend", "web"]
+    },
+    {
+        "id": "sql-select",
+        "language": "sql",
+        "title": "Basic Join",
+        "code": "SELECT u.name, o.order_date\nFROM users u\nJOIN orders o ON u.id = o.user_id\nWHERE o.status = 'shipped'\nORDER BY o.order_date DESC;",
+        "difficulty": "medium",
+        "tags": ["sql", "database"]
+    },
+    {
+        "id": "bash-check",
+        "language": "bash",
+        "title": "File Existence Check",
+        "code": "if [ -f \"$FILE\" ]; then\n    echo \"$FILE exists.\"\nelse\n    echo \"$FILE does not exist.\"\nfi",
+        "difficulty": "easy",
+        "tags": ["bash", "system", "cli"]
     }
 ]
