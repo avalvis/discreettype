@@ -105,7 +105,18 @@ def main():
         if not selected_snippet:
             break
             
-        app = TypingApp(selected_snippet)
+        # Select Interaction Mode
+        console.print("\n[bold]Select Interaction Mode:[/bold]")
+        console.print(" [bold cyan]1.[/bold cyan] Standard (Strict accuracy)")
+        console.print(" [bold cyan]2.[/bold cyan] IDE Mode (Auto-pairs, Indentation assist)")
+        
+        try:
+            m_choice = IntPrompt.ask("\nMode", choices=["1", "2"], default=1)
+            mode = "standard" if m_choice == 1 else "ide"
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        app = TypingApp(selected_snippet, mode=mode)
         result = app.run()
         
         if result:

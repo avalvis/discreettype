@@ -16,14 +16,15 @@ from ..core.session import TypingSession
 from .typing import TypingStateProcessor, get_typing_style
 
 class TypingApp:
-    def __init__(self, snippet):
+    def __init__(self, snippet, mode: str = "standard"):
         self.snippet = snippet
+        self.mode = mode
         self.session = TypingSession(snippet.id, snippet.code, snippet.language)
         
         self.template = snippet.code
         self.mistakes = {} # Position -> Wrong Char
         
-        # Buffer initialized with the TARGET code
+        # Initialize buffer with the full code using a Document to avoid ReadOnly errors
         self.buffer = Buffer(
             document=Document(text=snippet.code, cursor_position=0),
             read_only=True,
@@ -143,6 +144,23 @@ class TypingApp:
             self.session.errors += 1
         
         self.buffer.cursor_position += 1
+        
+        # IDE Mode Assists
+        if self.mode == "ide":
+            # 1. Indentation Assist: If we just typed a newline, jump past leading spaces
+            if char == "\n":
+                new_pos = self.buffer.cursor_position
+                while new_pos < len(self.template) and self.template[new_pos] in " \t":
+                    new_pos += 1
+                self.buffer.cursor_position = new_pos
+            
+            # 2. Auto-Pairing: If we typed an opener and next is the closer
+            elif char in "([{<'\"":
+                pairs = {"(": ")", "[": "]", "{": "}", "<": ">", "'": "'", "\"": "\""}
+                next_pos = self.buffer.cursor_position
+                if next_pos < len(self.template) and self.template[next_pos] == pairs.get(char):
+                    # Auto-fill the closer and move cursor past it
+                    self.buffer.cursor_position += 1
         
         # Check if done
         if self.buffer.cursor_position >= len(self.template):
