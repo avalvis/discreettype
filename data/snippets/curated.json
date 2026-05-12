@@ -1,0 +1,26 @@
+[
+    {
+        "id": "py-hello",
+        "language": "python",
+        "title": "Hello World",
+        "code": "def main():\n    print(\"Hello, World!\")\n\nif __name__ == \"__main__\":\n    main()",
+        "difficulty": "easy",
+        "tags": ["basics"]
+    },
+    {
+        "id": "py-list-comp",
+        "language": "python",
+        "title": "List Comprehension",
+        "code": "numbers = [1, 2, 3, 4, 5]\nsquares = [n**2 for n in numbers if n % 2 == 0]\nprint(squares)",
+        "difficulty": "easy",
+        "tags": ["basics", "comprehension"]
+    },
+    {
+        "id": "ts-interface",
+        "language": "typescript",
+        "title": "User Interface",
+        "code": "interface User {\n    id: number;\n    username: string;\n    email: string;\n}\n\nconst getUser = (id: number): User => {\n    return { id, username: \"dev\", email: \"dev@example.com\" };\n};",
+        "difficulty": "medium",
+        "tags": ["interfaces", "types"]
+    }
+]
