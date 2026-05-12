@@ -1,82 +1,77 @@
 from prompt_toolkit.layout.processors import Processor, Transformation, TransformationInput
-from pygments.lexers import get_lexer_by_name
-from pygments.lexers.python import PythonLexer
-from pygments.util import ClassNotFound
-import pygments
+from typing import Dict
 
-class TypingOverlayProcessor(Processor):
+class TypingStateProcessor(Processor):
     """
-    A processor that renders the target text 'under' the user's input,
-    coloring characters based on correctness and retaining syntax highlighting.
+    A processor that styles the buffer based on the user's typing progress.
+    It displays the WRONG character if a mistake was made, otherwise the original.
     """
-    def __init__(self, target_text: str, lexer_name: str = "python"):
-        self.target_text = target_text
-        try:
-            self.lexer = get_lexer_by_name(lexer_name)
-        except ClassNotFound:
-            self.lexer = PythonLexer()
-            
-        # Pre-calculate syntax highlighting tokens for the target text
-        self.tokens = list(pygments.lex(target_text, self.lexer))
-        self.char_styles = []
-        for token_type, value in self.tokens:
-            token_str = str(token_type).replace("Token.", "").lower()
-            style_class = f"class:pygments.{token_str}"
-            for char in value:
-                self.char_styles.append(style_class)
+    def __init__(self, mistakes: Dict[int, str]):
+        self.mistakes = mistakes
 
     def apply_transformation(self, ti: TransformationInput) -> Transformation:
-        fragments = []
-        user_text = ti.buffer_control.buffer.text
+        new_fragments = []
+        # CORRECT way to get the absolute index of the start of the current line
+        line_start_index = ti.buffer_control.buffer.document.translate_row_col_to_index(ti.lineno, 0)
+        cursor_pos = ti.buffer_control.buffer.cursor_position
         
-        for i, char in enumerate(self.target_text):
-            syntax_style = self.char_styles[i] if i < len(self.char_styles) else ""
-            
-            if i < len(user_text):
-                # Character has been typed
-                if user_text[i] == char:
-                    # Correct - Brightened syntax color or white
-                    # For a professional look, let's use a "bright" version of the syntax color
-                    # or a dedicated 'correct' style.
-                    fragments.append((f"{syntax_style} class:typing.correct", char))
+        current_abs_pos = line_start_index
+        
+        # ti.fragments contains the syntax-highlighted fragments for the current line
+        for style, text in ti.fragments:
+            for char in text:
+                # Determine typing state style
+                if current_abs_pos < cursor_pos:
+                    if current_abs_pos in self.mistakes:
+                        # Error: Red background
+                        state_style = "class:typing.incorrect"
+                        display_char = self.mistakes[current_abs_pos]
+                        if display_char == " ": display_char = "·"
+                    else:
+                        # Correct: Bold the original syntax color
+                        state_style = "class:typing.correct"
+                        display_char = char
+                elif current_abs_pos == cursor_pos:
+                    # Cursor: Highlight this character
+                    state_style = "class:typing.cursor"
+                    display_char = char
                 else:
-                    # Incorrect - Error highlight
-                    display_char = char if char != "\n" else "↵\n"
-                    fragments.append(("class:typing.incorrect", display_char))
-            elif i == len(user_text):
-                # Current cursor position
-                # If the target char is a newline, we might want to show a hint
-                display_char = char
-                if char == "\n":
-                    fragments.append(("class:typing.cursor", "↵"))
-                    fragments.append(("", "\n"))
-                else:
-                    fragments.append((f"{syntax_style} class:typing.cursor", char))
-            else:
-                # Untyped character - Dimmed syntax highlighting
-                fragments.append((f"{syntax_style} class:typing.untyped", char))
+                    # Untyped: Use standard syntax highlighting ONLY
+                    state_style = "" 
+                    display_char = char
                 
-        return Transformation(fragments)
+                # Combine the lexer style with our state class
+                combined_style = f"{style} {state_style}".strip()
+                new_fragments.append((combined_style, display_char))
+                current_abs_pos += 1
+        
+        # Handle trailing cursor (at the end of a line)
+        if current_abs_pos == cursor_pos:
+            new_fragments.append(("class:typing.cursor", " "))
+                
+        return Transformation(new_fragments)
 
 def get_typing_style():
     """Returns the style definitions for the typing area."""
     return {
         # Typing States
-        "typing.correct": "#ffffff bold",        # Bright white
-        "typing.incorrect": "bg:#880000 #ffffff", # Red background for mistakes
-        "typing.untyped": "#444444",              # Default muted gray fallback
-        "typing.cursor": "reverse #ffffff",       # Active position (Block cursor effect)
+        "typing.correct": "bold #ffffff",           # Bold white for typed text
+        "typing.incorrect": "bg:#cc3333 #ffffff bold", # Bright red for mistakes
+        "typing.cursor": "reverse #ffffff",         # Block cursor
         
-        # Professional Muted Pygments Styles (Subtle but distinct)
-        "pygments.keyword": "#569cd6",           # Blue
-        "pygments.name.function": "#dcdcaa",     # Yellowish
-        "pygments.name.class": "#4ec9b0",        # Teal
-        "pygments.string": "#ce9178",            # Orange/Brown
-        "pygments.comment": "#6a9955",           # Green
-        "pygments.operator": "#d4d4d4",          # Light Gray
-        "pygments.punctuation": "#808080",       # Darker Gray
-        "pygments.name": "#9cdcfe",              # Light Blue
-        "pygments.literal.number": "#b5cea8",    # Light Green
+        # VS Code-like Muted Syntax Colors (Dark Theme)
+        "pygments.keyword": "#569cd6",
         "pygments.keyword.declaration": "#569cd6",
-        "pygments.name.builtin": "#569cd6",
+        "pygments.name.function": "#dcdcaa",
+        "pygments.name.class": "#4ec9b0",
+        "pygments.string": "#ce9178",
+        "pygments.comment": "#6a9955 italic",
+        "pygments.operator": "#d4d4d4",
+        "pygments.punctuation": "#cccccc",
+        "pygments.name": "#9cdcfe",
+        "pygments.literal.number": "#b5cea8",
+        
+        # UI Elements
+        "line-number": "#5a5a5a",
+        "line-number.current": "#c6c6c6",
     }
