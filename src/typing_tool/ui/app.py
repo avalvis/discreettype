@@ -23,6 +23,7 @@ class TypingApp:
         
         self.template = snippet.code
         self.mistakes = {} # Position -> Wrong Char
+        self.auto_pairs = {} # Opener Pos -> Closer Pos
         
         # Initialize buffer with the full code using a Document to avoid ReadOnly errors
         self.buffer = Buffer(
@@ -46,7 +47,7 @@ class TypingApp:
             content=BufferControl(
                 buffer=self.buffer,
                 lexer=lexer,
-                input_processors=[TypingStateProcessor(self.mistakes)],
+                input_processors=[TypingStateProcessor(self.mistakes, set(self.auto_pairs.values()))],
                 include_default_input_processors=False # We handle cursor visually
             ),
             left_margins=[NumberedMargin()],
@@ -101,6 +102,11 @@ class TypingApp:
                 if pos in self.mistakes:
                     del self.mistakes[pos]
                 
+                # IDE Mode: If we backspace an opener, also un-auto-complete its closer
+                if self.mode == "ide" and pos in self.auto_pairs:
+                    del self.auto_pairs[pos]
+                    self.update_ui_processors()
+                
         @self.kb.add("enter")
         def _(event):
             self.handle_char("\n")
@@ -110,15 +116,20 @@ class TypingApp:
             # Intelligent Tab: handle indentation
             pos = self.buffer.cursor_position
             if pos < len(self.template):
-                # Check if we are at indentation spaces
-                target = self.template[pos:pos+4]
-                if target == "    ": 
-                    for _ in range(4): self.handle_char(" ")
-                elif self.template[pos] == "\t":
-                    self.handle_char("\t")
-                elif self.template[pos] == " ":
-                    # Skip single space or whatever indentation is there
-                    self.handle_char(" ")
+                if self.template[pos] in " \t":
+                    # In IDE mode, Tab skips the entire indentation block
+                    if self.mode == "ide":
+                        while self.buffer.cursor_position < len(self.template) and self.template[self.buffer.cursor_position] in " \t":
+                            self.handle_char(self.template[self.buffer.cursor_position])
+                    else:
+                        # Standard mode: skip up to 4 spaces or 1 tab
+                        target = self.template[pos:pos+4]
+                        if target == "    ": 
+                            for _ in range(4): self.handle_char(" ")
+                        elif self.template[pos] == "\t":
+                            self.handle_char("\t")
+                        elif self.template[pos] == " ":
+                            self.handle_char(" ")
 
         @self.kb.add("<any>")
         def _(event):
@@ -129,6 +140,20 @@ class TypingApp:
         if not self.session.start_time:
             self.session.start()
             
+        # SMART SKIP: If we are at an auto-completed closer and typed the NEXT char, jump past it
+        if self.mode == "ide":
+            while (self.buffer.cursor_position < len(self.template) and 
+                   self.buffer.cursor_position in self.auto_pairs.values() and 
+                   char != self.template[self.buffer.cursor_position]):
+                
+                # We are at an auto-completed closer but typed something else.
+                # If what we typed matches the character AFTER the closer, skip the closer.
+                next_pos = self.buffer.cursor_position + 1
+                if next_pos < len(self.template) and char == self.template[next_pos]:
+                    self.buffer.cursor_position += 1
+                else:
+                    break
+
         pos = self.buffer.cursor_position
         if pos >= len(self.template):
             return
@@ -154,18 +179,54 @@ class TypingApp:
                     new_pos += 1
                 self.buffer.cursor_position = new_pos
             
-            # 2. Auto-Pairing: If we typed an opener and next is the closer
+            # 2. Smart Auto-Pairing
             elif char in "([{<'\"":
-                pairs = {"(": ")", "[": "]", "{": "}", "<": ">", "'": "'", "\"": "\""}
-                next_pos = self.buffer.cursor_position
-                if next_pos < len(self.template) and self.template[next_pos] == pairs.get(char):
-                    # Auto-fill the closer and move cursor past it
-                    self.buffer.cursor_position += 1
+                opener_pos = pos
+                closer_pos = self.find_matching_closer(opener_pos, char)
+                if closer_pos != -1:
+                    self.auto_pairs[opener_pos] = closer_pos
+                    self.update_ui_processors()
         
         # Check if done
         if self.buffer.cursor_position >= len(self.template):
             self.session.end()
             self.app.exit(result=self.session.get_metrics())
+
+    def find_matching_closer(self, opener_pos: int, opener_char: str) -> int:
+        pairs = {"(": ")", "[": "]", "{": "}", "<": ">", "'": "'", "\"": "\""}
+        closer_char = pairs.get(opener_char)
+        if not closer_char: return -1
+        
+        if opener_char in "'\"":
+            # For quotes, just find the next one on the same line
+            for i in range(opener_pos + 1, len(self.template)):
+                if self.template[i] == "\n": break
+                if self.template[i] == closer_char:
+                    # Check if escaped
+                    if i > 0 and self.template[i-1] == "\\": continue
+                    return i
+            return -1
+        else:
+            # For brackets, use a simple stack-based search
+            stack = 1
+            for i in range(opener_pos + 1, len(self.template)):
+                if self.template[i] == opener_char:
+                    stack += 1
+                elif self.template[i] == closer_char:
+                    stack -= 1
+                    if stack == 0:
+                        return i
+            return -1
+
+    def update_ui_processors(self):
+        # Update the processor with new auto-pair values
+        if hasattr(self, 'typing_window'):
+            control = self.typing_window.content
+            if isinstance(control, BufferControl):
+                for p in control.input_processors:
+                    if isinstance(p, TypingStateProcessor):
+                        p.auto_completed = set(self.auto_pairs.values())
+                        break
 
     def toggle_boss_mode(self):
         self.boss_mode = not self.boss_mode
@@ -183,7 +244,7 @@ class TypingApp:
             self.typing_window.content = BufferControl(
                 buffer=self.buffer,
                 lexer=lexer,
-                input_processors=[TypingStateProcessor(self.mistakes)],
+                input_processors=[TypingStateProcessor(self.mistakes, set(self.auto_pairs.values()))],
                 include_default_input_processors=False
             )
 

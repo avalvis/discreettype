@@ -1,13 +1,14 @@
 from prompt_toolkit.layout.processors import Processor, Transformation, TransformationInput
-from typing import Dict
+from typing import Dict, Set
 
 class TypingStateProcessor(Processor):
     """
     A processor that styles the buffer based on the user's typing progress.
     It displays the WRONG character if a mistake was made, otherwise the original.
     """
-    def __init__(self, mistakes: Dict[int, str]):
+    def __init__(self, mistakes: Dict[int, str], auto_completed: Set[int] = None):
         self.mistakes = mistakes
+        self.auto_completed = auto_completed or set()
 
     def apply_transformation(self, ti: TransformationInput) -> Transformation:
         new_fragments = []
@@ -28,6 +29,10 @@ class TypingStateProcessor(Processor):
                         display_char = char
                 elif current_abs_pos == cursor_pos:
                     state_style = "class:typing.cursor"
+                    display_char = char
+                elif current_abs_pos in self.auto_completed:
+                    # Visually indicate this is already "taken care of"
+                    state_style = "class:typing.correct"
                     display_char = char
                 else:
                     state_style = "class:typing.untyped"
