@@ -12,9 +12,10 @@ class SnippetManager:
 
     def get_categories(self) -> List[str]:
         return [
-            "Algorithms & Basics",
+            "Algorithms & Basics (Python)",
             "Web Development (TS/JS)",
-            "System & DevOps (Bash)",
+            "System & Low-Level (Rust/Go/Cpp)",
+            "Shell & DevOps (Bash)",
             "Database & SQL",
             "GitHub Explorer",
             "Random Mix"
@@ -22,7 +23,8 @@ class SnippetManager:
 
     def load_local_snippets(self) -> List[Snippet]:
         if not self.local_path.exists():
-            alt_path = Path("../") / self.local_path
+            # Try absolute path or project relative
+            alt_path = Path(__file__).parent.parent.parent.parent / self.local_path
             if alt_path.exists():
                 self.local_path = alt_path
             else:
@@ -35,12 +37,13 @@ class SnippetManager:
         local_snippets = self.load_local_snippets()
         
         if category == "Random Mix":
-            return random.sample(local_snippets, min(len(local_snippets), 5))
+            return random.sample(local_snippets, min(len(local_snippets), 10))
             
         cat_map = {
-            "Algorithms & Basics": ["basics", "algorithms"],
-            "Web Development (TS/JS)": ["types", "frontend", "web", "typescript", "javascript"],
-            "System & DevOps (Bash)": ["bash", "system", "cli"],
+            "Algorithms & Basics (Python)": ["basics", "algorithms", "decorators", "advanced"],
+            "Web Development (TS/JS)": ["types", "frontend", "web", "typescript", "javascript", "async"],
+            "System & Low-Level (Rust/Go/Cpp)": ["rust", "enums", "patterns", "go", "concurrency", "cpp", "templates"],
+            "Shell & DevOps (Bash)": ["bash", "system", "cli"],
             "Database & SQL": ["sql", "database"]
         }
         

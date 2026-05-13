@@ -53,7 +53,7 @@ def get_typing_style():
         # Typing States
         "typing.correct": "bold #ffffff",
         "typing.incorrect": "bg:#cc3333 #ffffff bold",
-        "typing.cursor": "reverse #ffffff",
+        "typing.cursor": "bg:#444444 blink",
         "typing.untyped": "",
         
         # High-Contrast IDE Syntax Colors (Optimized for readability)

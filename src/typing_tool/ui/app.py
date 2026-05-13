@@ -113,11 +113,11 @@ class TypingApp:
 
         @self.kb.add("tab")
         def _(event):
-            # Intelligent Tab: handle indentation
+            # Intelligent Tab: handle indentation and jumping out of brackets
             pos = self.buffer.cursor_position
             if pos < len(self.template):
+                # 1. Skip indentation
                 if self.template[pos] in " \t":
-                    # In IDE mode, Tab skips the entire indentation block
                     if self.mode == "ide":
                         while self.buffer.cursor_position < len(self.template) and self.template[self.buffer.cursor_position] in " \t":
                             self.handle_char(self.template[self.buffer.cursor_position])
@@ -130,6 +130,10 @@ class TypingApp:
                             self.handle_char("\t")
                         elif self.template[pos] == " ":
                             self.handle_char(" ")
+                # 2. IDE Mode: Skip auto-completed closers
+                elif self.mode == "ide" and pos in self.auto_pairs.values():
+                    while self.buffer.cursor_position < len(self.template) and self.buffer.cursor_position in self.auto_pairs.values():
+                        self.buffer.cursor_position += 1
 
         @self.kb.add("<any>")
         def _(event):
@@ -140,18 +144,38 @@ class TypingApp:
         if not self.session.start_time:
             self.session.start()
             
-        # SMART SKIP: If we are at an auto-completed closer and typed the NEXT char, jump past it
+        # SMART SKIP: If we are at auto-completed closers and typed something that appears LATER, jump past them
         if self.mode == "ide":
             while (self.buffer.cursor_position < len(self.template) and 
                    self.buffer.cursor_position in self.auto_pairs.values() and 
                    char != self.template[self.buffer.cursor_position]):
                 
-                # We are at an auto-completed closer but typed something else.
-                # If what we typed matches the character AFTER the closer, skip the closer.
-                next_pos = self.buffer.cursor_position + 1
-                if next_pos < len(self.template) and char == self.template[next_pos]:
-                    self.buffer.cursor_position += 1
-                else:
+                # Check if 'char' matches something further ahead (on the same line)
+                # This allows skipping through multiple brackets if you type the character AFTER them.
+                found_match_ahead = False
+                for i in range(self.buffer.cursor_position + 1, len(self.template)):
+                    if self.template[i] == "\n": break
+                    if self.template[i] == char:
+                        # Skip everything up to this character
+                        self.buffer.cursor_position = i
+                        found_match_ahead = True
+                        break
+                    # We can only skip if the characters we pass are auto-completed closers or whitespace
+                    if not (i in self.auto_pairs.values() or self.template[i] in " \t"):
+                        break
+                
+                if not found_match_ahead:
+                    # Special case for Enter: if we press Enter and there's a newline ahead (only closers/spaces between)
+                    if char == "\n":
+                        for i in range(self.buffer.cursor_position, len(self.template)):
+                            if self.template[i] == "\n":
+                                self.buffer.cursor_position = i
+                                found_match_ahead = True
+                                break
+                            if not (i in self.auto_pairs.values() or self.template[i] in " \t"):
+                                break
+                
+                if not found_match_ahead:
                     break
 
         pos = self.buffer.cursor_position
