@@ -6,7 +6,7 @@ DiscreetType brings a Monkeytype-inspired typing experience into the terminal wh
 
 > Built for developers who want to practice on real code without opening a flashy browser typing site.
 
-![discreettype](C:\Users\a.valvis\Downloads\discreettype.gif)
+<img width="1233" height="656" alt="discreettype" src="https://github.com/user-attachments/assets/99e6f771-13cc-4dfb-a04f-1b4ad9f5a989" />
 
 ## ✨ Why DiscreetType?
 
