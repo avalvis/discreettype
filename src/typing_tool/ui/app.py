@@ -143,16 +143,29 @@ class TypingApp:
     def handle_char(self, char: str):
         if not self.session.start_time:
             self.session.start()
-            
-        # SMART SKIP: If we are at auto-completed closers and typed something that appears LATER, jump past them
+
+        is_sql = self.snippet.language.lower() == "sql"
+        
+        # IDE Mode: Flexible Whitespace & Assists
         if self.mode == "ide":
-            is_sql = self.snippet.language.lower() == "sql"
+            # 1. Flexible Whitespace: If user types a space where there isn't one, just ignore it
+            # This handles (a,b) -> (a, b) and a+b -> a + b
+            if char in " \t" and self.buffer.cursor_position < len(self.template):
+                target_char = self.template[self.buffer.cursor_position]
+                if target_char not in " \t":
+                    return # Just ignore the extra space
+            
+            # 2. Smart Skip / Flexible Whitespace: 
+            # If we are at whitespace or auto-completed closers, and user types something LATER on the line
+            # This handles (a, b) -> (a,b) and a + b -> a+b
             while (self.buffer.cursor_position < len(self.template) and 
-                   self.buffer.cursor_position in self.auto_pairs.values()):
+                   (self.buffer.cursor_position in self.auto_pairs.values() or 
+                    self.template[self.buffer.cursor_position] in " \t")):
                 
                 # If the character matches what we have here, don't skip
-                match_here = (char == self.template[self.buffer.cursor_position])
-                if not match_here and is_sql and char.lower() == self.template[self.buffer.cursor_position].lower():
+                target_here = self.template[self.buffer.cursor_position]
+                match_here = (char == target_here)
+                if not match_here and is_sql and char.lower() == target_here.lower():
                     match_here = True
                 
                 if match_here:
@@ -164,11 +177,12 @@ class TypingApp:
                 for i in range(self.buffer.cursor_position + 1, len(self.template)):
                     if self.template[i] == "\n": break
                     
-                    match = (self.template[i] == char)
-                    if not match and is_sql and self.template[i].lower() == char.lower():
-                        match = True
+                    target_ahead = self.template[i]
+                    match_ahead = (target_ahead == char)
+                    if not match_ahead and is_sql and target_ahead.lower() == char.lower():
+                        match_ahead = True
                         
-                    if match:
+                    if match_ahead:
                         # Skip everything up to this character
                         self.buffer.cursor_position = i
                         found_match_ahead = True
@@ -200,7 +214,7 @@ class TypingApp:
         is_correct = (char == target_char)
         
         # IDE Mode Improvement: Optional capitalization for SQL
-        if not is_correct and self.mode == "ide" and self.snippet.language.lower() == "sql":
+        if not is_correct and self.mode == "ide" and is_sql:
             if char.lower() == target_char.lower():
                 is_correct = True
 
