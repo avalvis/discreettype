@@ -146,16 +146,29 @@ class TypingApp:
             
         # SMART SKIP: If we are at auto-completed closers and typed something that appears LATER, jump past them
         if self.mode == "ide":
+            is_sql = self.snippet.language.lower() == "sql"
             while (self.buffer.cursor_position < len(self.template) and 
-                   self.buffer.cursor_position in self.auto_pairs.values() and 
-                   char != self.template[self.buffer.cursor_position]):
+                   self.buffer.cursor_position in self.auto_pairs.values()):
+                
+                # If the character matches what we have here, don't skip
+                match_here = (char == self.template[self.buffer.cursor_position])
+                if not match_here and is_sql and char.lower() == self.template[self.buffer.cursor_position].lower():
+                    match_here = True
+                
+                if match_here:
+                    break
                 
                 # Check if 'char' matches something further ahead (on the same line)
                 # This allows skipping through multiple brackets if you type the character AFTER them.
                 found_match_ahead = False
                 for i in range(self.buffer.cursor_position + 1, len(self.template)):
                     if self.template[i] == "\n": break
-                    if self.template[i] == char:
+                    
+                    match = (self.template[i] == char)
+                    if not match and is_sql and self.template[i].lower() == char.lower():
+                        match = True
+                        
+                    if match:
                         # Skip everything up to this character
                         self.buffer.cursor_position = i
                         found_match_ahead = True
@@ -184,7 +197,14 @@ class TypingApp:
 
         target_char = self.template[pos]
         
-        if char == target_char:
+        is_correct = (char == target_char)
+        
+        # IDE Mode Improvement: Optional capitalization for SQL
+        if not is_correct and self.mode == "ide" and self.snippet.language.lower() == "sql":
+            if char.lower() == target_char.lower():
+                is_correct = True
+
+        if is_correct:
             # Correct!
             pass
         else:
