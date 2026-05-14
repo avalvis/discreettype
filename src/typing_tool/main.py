@@ -45,8 +45,8 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
 
                 if not snippet:
                     console.print("[red]Error: Could not fetch snippet. Falling back to local data.[/red]")
-                    return random.choice(snippet_manager.load_local_snippets())
-                return snippet
+                    return (random.choice(snippet_manager.load_local_snippets()), None)
+                return (snippet, selected_lang)
 
             # Local categories
             snippets = snippet_manager.get_snippets_by_category(category)
@@ -55,7 +55,7 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
             selected_snippet = select_item(f"Snippets in {category}", snippets, labels=labels)
             if not selected_snippet:
                 continue
-            return selected_snippet
+            return (selected_snippet, None)
     except (KeyboardInterrupt, EOFError):
         return None
 
@@ -100,11 +100,13 @@ def main():
     console = Console()
     snippet_manager = SnippetManager()
     history_manager = HistoryManager()
+    should_exit = False
     
     while True:
-        selected_snippet = show_main_menu(console, snippet_manager)
-        if not selected_snippet:
+        selection = show_main_menu(console, snippet_manager)
+        if not selection:
             break
+        selected_snippet, github_language = selection
             
         # Select Interaction Mode
         modes = [
@@ -121,15 +123,31 @@ def main():
         if not mode_choice:
             continue
 
-        app = TypingApp(selected_snippet, mode=mode_choice)
-        result = app.run()
-        
-        if result:
-            if not show_results(console, result, history_manager):
+        while True:
+            app = TypingApp(
+                selected_snippet,
+                mode=mode_choice,
+                allow_refresh=bool(github_language),
+            )
+            result = app.run()
+
+            if result == "refresh_snippet" and github_language:
+                with Live(Spinner("dots", text=f" Fetching another {github_language} snippet from GitHub..."), console=console, transient=True):
+                    refreshed = snippet_manager.fetch_random_github_snippet(github_language)
+                if refreshed:
+                    selected_snippet = refreshed
+                continue
+
+            if result:
+                if not show_results(console, result, history_manager):
+                    should_exit = True
                 break
-        else:
+
             # Cancelled session
-            continue
+            break
+
+        if should_exit:
+            break
 
     console.print("\n[dim]Happy coding.[/dim]")
 

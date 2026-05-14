@@ -126,9 +126,10 @@ def find_auto_completed_skip_target(cursor_pos: int, text_length: int, auto_comp
 
 
 class TypingApp:
-    def __init__(self, snippet, mode: str = "standard"):
+    def __init__(self, snippet, mode: str = "standard", allow_refresh: bool = False):
         self.snippet = snippet
         self.mode = mode
+        self.allow_refresh = allow_refresh
         self.session = TypingSession(snippet.id, snippet.code, snippet.language)
         
         self.template = snippet.code
@@ -173,8 +174,11 @@ class TypingApp:
             style="reverse"
         )
         
+        footer_text = " [Ctrl+C] Exit | [F12] Boss Key "
+        if self.allow_refresh:
+            footer_text = " [F5] Next Snippet | [Ctrl+C] Exit | [F12] Boss Key "
         self.footer = Window(
-            content=FormattedTextControl(" [Ctrl+C] Exit | [F12] Boss Key "),
+            content=FormattedTextControl(footer_text),
             height=1,
             style="reverse"
         )
@@ -209,6 +213,11 @@ class TypingApp:
         @self.kb.add("f12")
         def _(event):
             self.toggle_boss_mode()
+
+        if self.allow_refresh:
+            @self.kb.add("f5")
+            def _(event):
+                event.app.exit(result="refresh_snippet")
 
         @self.kb.add("backspace")
         def _(event):

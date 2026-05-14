@@ -95,6 +95,7 @@ Once launched, everything is designed to stay fast and keyboard-driven.
 - `Right Arrow` — In IDE mode, move past auto-completed closers or skip the current line comment
 - `Left Arrow` — In IDE mode, undo the most recent comment skip
 - `Backspace` — Correct mistakes
+- `F5` — In GitHub Explorer sessions, fetch another live snippet in the same language/mode
 - `F12` — Toggle Discreet Mode
 - `Ctrl+C` — Gracefully exit the current session or menu
 

@@ -40,4 +40,4 @@ def test_escape_from_snippet_selection_goes_back_to_category(monkeypatch):
     monkeypatch.setattr("typing_tool.main.select_item", fake_select_item)
 
     selected = show_main_menu(console, manager)
-    assert selected is snippet
+    assert selected == (snippet, None)
