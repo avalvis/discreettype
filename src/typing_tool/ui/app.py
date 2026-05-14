@@ -111,6 +111,18 @@ class TypingApp:
         def _(event):
             self.handle_char("\n")
 
+        # Disable navigation keys to prevent unintended behavior
+        @self.kb.add("up")
+        @self.kb.add("down")
+        @self.kb.add("left")
+        @self.kb.add("right")
+        @self.kb.add("pageup")
+        @self.kb.add("pagedown")
+        @self.kb.add("home")
+        @self.kb.add("end")
+        def _(event):
+            pass
+
         @self.kb.add("tab")
         def _(event):
             # Intelligent Tab: handle indentation and jumping out of brackets
