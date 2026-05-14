@@ -6,6 +6,8 @@ DiscreetType brings a Monkeytype-inspired typing experience into the terminal wh
 
 > Built for developers who want to practice on real code without opening a flashy browser typing site.
 
+![discreettype](C:\Users\a.valvis\Downloads\discreettype.gif)
+
 ## ✨ Why DiscreetType?
 
 Most typing apps feel playful, noisy, or generic. DiscreetType is designed to feel like a tool you would actually keep and use — fast, focused, keyboard-first, and polished enough to blend naturally into a professional setup. [cite:1][cite:3]
