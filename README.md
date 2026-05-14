@@ -39,6 +39,8 @@ For the best experience, you can create a desktop shortcut with a custom icon:
 - **↑ / ↓ Arrows:** Navigate menus.
 - **Enter:** Confirm selection / Move to next line in session.
 - **Tab:** Progress through indentation blocks.
+- **Right Arrow (IDE mode):** Move past auto-completed closers (for example `)` in `count(*)`) or skip the current line comment.
+- **Left Arrow (IDE mode):** Undo the most recent comment skip.
 - **Backspace:** Correct mistakes.
 - **F12:** Toggle Discreet Mode (Boss Key).
 - **Ctrl+C:** Gracefully exit the current session or menu.

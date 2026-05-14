@@ -9,11 +9,121 @@ from prompt_toolkit.styles import Style
 from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
-from prompt_toolkit.filters import Condition
 from prompt_toolkit.document import Document
 
 from ..core.session import TypingSession
 from .typing import TypingStateProcessor, get_typing_style
+
+
+def find_optional_whitespace_skip_target(template: str, start_pos: int, typed_char: str):
+    """Return the next matching index after contiguous spaces/tabs, if any."""
+    if start_pos >= len(template) or typed_char in " \t\n":
+        return None
+    if template[start_pos] not in " \t":
+        return None
+
+    temp_pos = start_pos
+    while temp_pos < len(template) and template[temp_pos] in " \t":
+        temp_pos += 1
+
+    if temp_pos < len(template) and template[temp_pos] == typed_char:
+        return temp_pos
+    return None
+
+
+def find_comment_skip_span(template: str, cursor_pos: int, language: str):
+    """Return (from_pos, to_pos) for a comment skip on the current line, if valid."""
+    if cursor_pos < 0 or cursor_pos >= len(template):
+        return None
+
+    line_start = template.rfind("\n", 0, cursor_pos) + 1
+    line_end = template.find("\n", cursor_pos)
+    if line_end == -1:
+        line_end = len(template)
+
+    line = template[line_start:line_end]
+    if not line:
+        return None
+
+    lang = language.lower()
+    if lang in {"python", "bash"}:
+        markers = ["#"]
+    elif lang == "sql":
+        markers = ["--"]
+    else:
+        markers = ["//", "#"]
+
+    marker_rel_pos = -1
+    marker_len = 0
+    for marker in markers:
+        pos = line.find(marker)
+        if pos != -1 and (marker_rel_pos == -1 or pos < marker_rel_pos):
+            marker_rel_pos = pos
+            marker_len = len(marker)
+
+    if marker_rel_pos == -1:
+        return None
+
+    comment_start = line_start + marker_rel_pos
+    comment_end = line_end
+    if comment_end <= comment_start:
+        return None
+
+    if cursor_pos < comment_start:
+        between = template[cursor_pos:comment_start]
+        if not all(ch in " \t" for ch in between):
+            return None
+        return (cursor_pos, comment_end)
+
+    if comment_start <= cursor_pos < comment_end:
+        return (cursor_pos, comment_end)
+
+    # cursor after comment end (or exactly line end)
+    if cursor_pos == comment_end and comment_start + marker_len < comment_end:
+        return None
+
+    return None
+
+
+def compute_post_char_skip_cursor(
+    template: str,
+    cursor_pos: int,
+    typed_char: str,
+    auto_completed_indices: set[int],
+) -> int:
+    """Compute safe post-typing cursor skips for IDE assist behavior."""
+    if cursor_pos >= len(template):
+        return cursor_pos
+
+    # Allow repeated whitespace presses to glide through contiguous indentation.
+    if typed_char in " \t":
+        while cursor_pos < len(template) and template[cursor_pos] == typed_char:
+            cursor_pos += 1
+        return cursor_pos
+
+    # Allow typed closer/quote to jump over auto-completed closers only.
+    if typed_char in ")]}>\"'":
+        while (
+            cursor_pos < len(template)
+            and cursor_pos in auto_completed_indices
+            and template[cursor_pos] == typed_char
+        ):
+            cursor_pos += 1
+        return cursor_pos
+
+    return cursor_pos
+
+
+def find_auto_completed_skip_target(cursor_pos: int, text_length: int, auto_completed_indices: set[int]):
+    """Return the cursor target when moving right over auto-completed indices."""
+    if cursor_pos < 0 or cursor_pos >= text_length or cursor_pos not in auto_completed_indices:
+        return None
+
+    target = cursor_pos
+    while target < text_length and target in auto_completed_indices:
+        target += 1
+    return target
+
 
 class TypingApp:
     def __init__(self, snippet, mode: str = "standard"):
@@ -24,6 +134,8 @@ class TypingApp:
         self.template = snippet.code
         self.mistakes = {} # Position -> Wrong Char
         self.auto_pairs = {} # Opener Pos -> Closer Pos
+        self.skipped_indices = set()
+        self.comment_skip_history = []
         
         # Initialize buffer with the full code using a Document to avoid ReadOnly errors
         self.buffer = Buffer(
@@ -47,7 +159,7 @@ class TypingApp:
             content=BufferControl(
                 buffer=self.buffer,
                 lexer=lexer,
-                input_processors=[TypingStateProcessor(self.mistakes, set(self.auto_pairs.values()))],
+                input_processors=[TypingStateProcessor(self.mistakes, self.get_auto_completed_indices())],
                 include_default_input_processors=False # We handle cursor visually
             ),
             left_margins=[NumberedMargin()],
@@ -85,6 +197,10 @@ class TypingApp:
         
         self.boss_mode = False
 
+    def get_auto_completed_indices(self):
+        """Returns a set of all indices that were automatically handled."""
+        return set(self.auto_pairs.values()) | self.skipped_indices
+
     def setup_key_bindings(self):
         @self.kb.add("c-c")
         def _(event):
@@ -106,22 +222,65 @@ class TypingApp:
                 if self.mode == "ide" and pos in self.auto_pairs:
                     del self.auto_pairs[pos]
                     self.update_ui_processors()
+
+                # IDE Mode: If we backspace over skipped whitespace, restore it.
+                if self.mode == "ide" and pos in self.skipped_indices:
+                    self.skipped_indices.remove(pos)
+                    self.update_ui_processors()
                 
         @self.kb.add("enter")
         def _(event):
             self.handle_char("\n")
 
-        # Disable navigation keys to prevent unintended behavior
+        # Disable most navigation keys to prevent unintended behavior
         @self.kb.add("up")
         @self.kb.add("down")
-        @self.kb.add("left")
-        @self.kb.add("right")
         @self.kb.add("pageup")
         @self.kb.add("pagedown")
         @self.kb.add("home")
         @self.kb.add("end")
         def _(event):
             pass
+
+        @self.kb.add("right")
+        def _(event):
+            if self.mode != "ide":
+                return
+
+            auto_target = find_auto_completed_skip_target(
+                self.buffer.cursor_position,
+                len(self.template),
+                self.get_auto_completed_indices(),
+            )
+            if auto_target is not None:
+                self.buffer.cursor_position = auto_target
+                return
+
+            span = find_comment_skip_span(self.template, self.buffer.cursor_position, self.snippet.language)
+            if not span:
+                return
+            from_pos, to_pos = span
+            newly_skipped = set()
+            for i in range(from_pos, to_pos):
+                if i not in self.skipped_indices:
+                    newly_skipped.add(i)
+                self.skipped_indices.add(i)
+            self.comment_skip_history.append((from_pos, to_pos, newly_skipped))
+            self.buffer.cursor_position = to_pos
+            self.update_ui_processors()
+
+        @self.kb.add("left")
+        def _(event):
+            if self.mode != "ide" or not self.comment_skip_history:
+                return
+            from_pos, to_pos, newly_skipped = self.comment_skip_history[-1]
+            if self.buffer.cursor_position != to_pos:
+                return
+            self.comment_skip_history.pop()
+            for i in newly_skipped:
+                self.skipped_indices.discard(i)
+            self.buffer.cursor_position = from_pos
+            self.update_ui_processors()
 
         @self.kb.add("tab")
         def _(event):
@@ -143,13 +302,18 @@ class TypingApp:
                         elif self.template[pos] == " ":
                             self.handle_char(" ")
                 # 2. IDE Mode: Skip auto-completed closers
-                elif self.mode == "ide" and pos in self.auto_pairs.values():
-                    while self.buffer.cursor_position < len(self.template) and self.buffer.cursor_position in self.auto_pairs.values():
+                elif self.mode == "ide" and pos in self.get_auto_completed_indices():
+                    while (
+                        self.buffer.cursor_position < len(self.template)
+                        and self.buffer.cursor_position in self.get_auto_completed_indices()
+                    ):
                         self.buffer.cursor_position += 1
 
         @self.kb.add("<any>")
         def _(event):
             for char in event.data:
+                if not char.isprintable():
+                    continue
                 self.handle_char(char)
 
     def handle_char(self, char: str):
@@ -174,13 +338,31 @@ class TypingApp:
             if char.lower() == target_char.lower():
                 is_correct = True
 
+        # IDE Mode: Allow skipping indentation-like whitespace naturally.
+        if self.mode == "ide" and not is_correct:
+            skip_target = find_optional_whitespace_skip_target(self.template, pos, char)
+            if skip_target is not None:
+                for i in range(pos, skip_target):
+                    self.skipped_indices.add(i)
+                self.buffer.cursor_position = skip_target
+                pos = skip_target
+                target_char = self.template[pos]
+                is_correct = True
+                self.update_ui_processors()
+
         if is_correct:
             # Correct!
-            pass
+            if pos in self.session.miskeyed_indices:
+                self.session.corrected_errors += 1
+                self.session.miskeyed_indices.remove(pos)
+            if pos in self.mistakes:
+                del self.mistakes[pos]
         else:
             # Mistake!
+            if pos not in self.session.miskeyed_indices:
+                self.session.errors += 1
+                self.session.miskeyed_indices.add(pos)
             self.mistakes[pos] = char
-            self.session.errors += 1
         
         # Advance cursor ONE step
         self.buffer.cursor_position += 1
@@ -191,8 +373,10 @@ class TypingApp:
             if char == "\n":
                 new_pos = self.buffer.cursor_position
                 while new_pos < len(self.template) and self.template[new_pos] in " \t":
+                    self.skipped_indices.add(new_pos)
                     new_pos += 1
                 self.buffer.cursor_position = new_pos
+                self.update_ui_processors()
             
             # 2. Smart Auto-Pairing
             elif char in "([{<'\"" and is_correct:
@@ -202,17 +386,13 @@ class TypingApp:
                     self.auto_pairs[opener_pos] = closer_pos
                     self.update_ui_processors()
 
-            # 3. Simple Skip (Template's whitespace/closers)
-            # This logic triggers when we hit a closer or space and want to jump past it.
-            while self.buffer.cursor_position < len(self.template):
-                next_pos = self.buffer.cursor_position
-                next_target = self.template[next_pos]
-                if next_pos in self.auto_pairs.values() and char == next_target:
-                    self.buffer.cursor_position += 1
-                elif next_target in " \t" and char == next_target:
-                     self.buffer.cursor_position += 1
-                else:
-                    break
+            # 3. Safe post-char skips for whitespace/auto-completed closers
+            self.buffer.cursor_position = compute_post_char_skip_cursor(
+                self.template,
+                self.buffer.cursor_position,
+                char,
+                self.get_auto_completed_indices(),
+            )
         
         # Check if done
         if self.buffer.cursor_position >= len(self.template):
@@ -246,13 +426,13 @@ class TypingApp:
             return -1
 
     def update_ui_processors(self):
-        # Update the processor with new auto-pair values
+        # Update the processor with new auto-pair/skipped values
         if hasattr(self, 'typing_window'):
             control = self.typing_window.content
             if isinstance(control, BufferControl):
                 for p in control.input_processors:
                     if isinstance(p, TypingStateProcessor):
-                        p.auto_completed = set(self.auto_pairs.values())
+                        p.auto_completed = self.get_auto_completed_indices()
                         break
 
     def toggle_boss_mode(self):
@@ -271,7 +451,7 @@ class TypingApp:
             self.typing_window.content = BufferControl(
                 buffer=self.buffer,
                 lexer=lexer,
-                input_processors=[TypingStateProcessor(self.mistakes, set(self.auto_pairs.values()))],
+                input_processors=[TypingStateProcessor(self.mistakes, self.get_auto_completed_indices())],
                 include_default_input_processors=False
             )
 

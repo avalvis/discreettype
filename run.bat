@@ -21,15 +21,25 @@ if %ERRORLEVEL% neq 0 (
 echo [BOOT] Preparing environment...
 uv sync --quiet
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to sync dependencies. Checking internet connection...
-    pause
-    exit /b 1
+    echo [WARN] Exact environment sync failed. Clearing read-only flags in .venv and retrying...
+    if exist ".venv" attrib -R ".venv\*" /S /D >nul 2>nul
+    uv sync --quiet
+)
+if %ERRORLEVEL% neq 0 (
+    echo [WARN] Exact sync still failing. Retrying with inexact sync...
+    uv sync --quiet --inexact
 )
 
 :: 3. Launch the application
-:: We use 'uv run' to automatically use the correct virtual environment
+:: We use 'uv run' to automatically use the correct virtual environment.
+:: If sync keeps failing because files are locked, fall back to no-sync launch.
 echo [BOOT] Launching Discreet Typing Tool...
-uv run python -m typing_tool.main
+if %ERRORLEVEL% neq 0 (
+    echo [WARN] Environment sync incomplete. Starting with existing environment...
+    uv run --no-sync python -m typing_tool.main
+) else (
+    uv run python -m typing_tool.main
+)
 
 if %ERRORLEVEL% neq 0 (
     if %ERRORLEVEL% neq 1 (
