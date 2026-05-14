@@ -20,38 +20,42 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
             "[bold blue]Discreet Typing Tool[/bold blue]\n[dim]Improve your code-typing speed and accuracy.[/dim]",
             border_style="blue"
         ))
-        
-        categories = snippet_manager.get_categories()
-        # Add Exit as an option in the interactive menu
-        menu_items = categories + ["Exit"]
-        
-        choice = select_item("Select a category", menu_items)
-        
-        if not choice or choice == "Exit":
-            return None
-            
-        category = choice
-        
-        if category == "GitHub Explorer":
-            languages = ["Python", "TypeScript", "JavaScript", "SQL", "Bash"]
-            selected_lang = select_item("Select a language to explore", languages)
-            if not selected_lang: return None
-            
-            with Live(Spinner("dots", text=f" Fetching random {selected_lang} snippet from GitHub..."), console=console, transient=True):
-                import random # Needed for fallback
-                snippet = snippet_manager.fetch_random_github_snippet(selected_lang)
-                
-            if not snippet:
-                console.print("[red]Error: Could not fetch snippet. Falling back to local data.[/red]")
-                return random.choice(snippet_manager.load_local_snippets())
-            return snippet
 
-        # Local categories
-        snippets = snippet_manager.get_snippets_by_category(category)
-        labels = [f"[{s.language}] {s.title} ({s.difficulty})" for s in snippets]
-        
-        selected_snippet = select_item(f"Snippets in {category}", snippets, labels=labels)
-        return selected_snippet
+        while True:
+            categories = snippet_manager.get_categories()
+            # Add Exit as an option in the interactive menu
+            menu_items = categories + ["Exit"]
+
+            choice = select_item("Select a category", menu_items)
+
+            if not choice or choice == "Exit":
+                return None
+
+            category = choice
+
+            if category == "GitHub Explorer":
+                languages = ["Python", "TypeScript", "JavaScript", "SQL", "Bash"]
+                selected_lang = select_item("Select a language to explore", languages)
+                if not selected_lang:
+                    continue
+
+                with Live(Spinner("dots", text=f" Fetching random {selected_lang} snippet from GitHub..."), console=console, transient=True):
+                    import random # Needed for fallback
+                    snippet = snippet_manager.fetch_random_github_snippet(selected_lang)
+
+                if not snippet:
+                    console.print("[red]Error: Could not fetch snippet. Falling back to local data.[/red]")
+                    return random.choice(snippet_manager.load_local_snippets())
+                return snippet
+
+            # Local categories
+            snippets = snippet_manager.get_snippets_by_category(category)
+            labels = [f"[{s.language}] {s.title} ({s.difficulty})" for s in snippets]
+
+            selected_snippet = select_item(f"Snippets in {category}", snippets, labels=labels)
+            if not selected_snippet:
+                continue
+            return selected_snippet
     except (KeyboardInterrupt, EOFError):
         return None
 
