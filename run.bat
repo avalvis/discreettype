@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 :: Discreet Typing Tool - Smart Launcher
 :: This script ensures the environment is ready and launches the app.
 
-title Discreet Typing Tool Launcher
+title Discreet Code Launcher
 
 :: 1. Check for 'uv' (the modern Python package manager)
 where uv >nul 2>nul

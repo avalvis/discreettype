@@ -5,6 +5,7 @@ from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.layout.margins import NumberedMargin
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
 from prompt_toolkit.styles import Style
 from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexers import get_lexer_by_name
@@ -13,6 +14,33 @@ from prompt_toolkit.document import Document
 
 from ..core.session import TypingSession
 from .typing import TypingStateProcessor, get_typing_style
+
+
+# prompt_toolkit registers several default emacs bindings that interfere with
+# a read-only buffer used for typing practice. We must explicitly reclaim them.
+#
+# Read-only emacs "pager" bindings (see prompt_toolkit/key_binding/bindings/
+# emacs.py): when a buffer is read_only=True, the keys below trigger search
+# navigation / incremental search instead of inserting the character. That
+# makes them feel like "cheat mode" - e.g. pressing 'n' jumps the cursor over
+# arbitrary characters because emacs interprets it as "jump to next match".
+PAGER_KEYS_TO_RECLAIM = ("n", "N", "?", "/")
+
+# Emacs cursor-movement bindings that operate on any buffer regardless of
+# read-only status. Left unchecked they would let the user accidentally
+# desynchronize the typing cursor from the typed text.
+CTRL_NAV_KEYS_TO_DISABLE = (
+    "c-a",
+    "c-b",
+    "c-e",
+    "c-f",
+    "c-left",
+    "c-right",
+    "c-home",
+    "c-end",
+    "c-up",
+    "c-down",
+)
 
 
 def find_optional_whitespace_skip_target(template: str, start_pos: int, typed_char: str):
@@ -221,6 +249,8 @@ class TypingApp:
 
         @self.kb.add("backspace")
         def _(event):
+            if self.boss_mode:
+                return
             if self.buffer.cursor_position > 0:
                 self.buffer.cursor_position -= 1
                 pos = self.buffer.cursor_position
@@ -253,7 +283,7 @@ class TypingApp:
 
         @self.kb.add("right")
         def _(event):
-            if self.mode != "ide":
+            if self.boss_mode or self.mode != "ide":
                 return
 
             auto_target = find_auto_completed_skip_target(
@@ -280,7 +310,7 @@ class TypingApp:
 
         @self.kb.add("left")
         def _(event):
-            if self.mode != "ide" or not self.comment_skip_history:
+            if self.boss_mode or self.mode != "ide" or not self.comment_skip_history:
                 return
             from_pos, to_pos, newly_skipped = self.comment_skip_history[-1]
             if self.buffer.cursor_position != to_pos:
@@ -293,6 +323,8 @@ class TypingApp:
 
         @self.kb.add("tab")
         def _(event):
+            if self.boss_mode:
+                return
             # Intelligent Tab: handle indentation and jumping out of brackets
             pos = self.buffer.cursor_position
             if pos < len(self.template):
@@ -318,6 +350,29 @@ class TypingApp:
                     ):
                         self.buffer.cursor_position += 1
 
+        # Reclaim emacs read-only pager bindings (n, N, ?, /) so they behave
+        # like normal typed characters instead of triggering search jumps.
+        # A specific-key binding wins over our <any> fallback in
+        # prompt_toolkit's matcher, so we have to register them explicitly.
+        for pager_key in PAGER_KEYS_TO_RECLAIM:
+            @self.kb.add(pager_key)
+            def _(event):
+                self.handle_char(event.data)
+
+        # Neutralize emacs cursor-motion bindings that would otherwise allow
+        # the user to silently desynchronize from the typing flow.
+        for ctrl_key in CTRL_NAV_KEYS_TO_DISABLE:
+            @self.kb.add(ctrl_key)
+            def _(event):
+                pass
+
+        # Disallow paste during a practice session. Without this, the default
+        # bracketed-paste handler tries to insert into the read-only buffer
+        # and rings the terminal bell.
+        @self.kb.add(Keys.BracketedPaste)
+        def _(event):
+            pass
+
         @self.kb.add("<any>")
         def _(event):
             for char in event.data:
@@ -326,6 +381,10 @@ class TypingApp:
                 self.handle_char(char)
 
     def handle_char(self, char: str):
+        # Ignore input while the boss-key disguise is showing; otherwise the
+        # session keeps recording keystrokes against an invisible cursor.
+        if self.boss_mode:
+            return
         if not self.session.start_time:
             self.session.start()
 

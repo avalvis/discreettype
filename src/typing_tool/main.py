@@ -40,12 +40,11 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
                     continue
 
                 with Live(Spinner("dots", text=f" Fetching random {selected_lang} snippet from GitHub..."), console=console, transient=True):
-                    import random # Needed for fallback
                     snippet = snippet_manager.fetch_random_github_snippet(selected_lang)
 
                 if not snippet:
-                    console.print("[red]Error: Could not fetch snippet. Falling back to local data.[/red]")
-                    return (random.choice(snippet_manager.load_local_snippets()), None)
+                    console.print("[red]Error: Could not fetch snippet. Check your connection or try a different language.[/red]")
+                    continue
                 return (snippet, selected_lang)
 
             # Local categories

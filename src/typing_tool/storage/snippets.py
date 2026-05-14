@@ -53,14 +53,17 @@ class SnippetManager:
 
     def fetch_random_github_snippet(self, language: str) -> Optional[Snippet]:
         """
-        Fetches a truly random snippet from GitHub using the client.
-        Falls back to local if fetching fails.
+        Fetch a random snippet from GitHub. On failure, fall back to a local
+        snippet that matches the requested language. Returns ``None`` only
+        when nothing is available (offline AND no curated snippet exists for
+        the language).
         """
         snippet = self.gh_client.fetch_random_snippet(language)
         if snippet:
             return snippet
-            
-        # Fallback to a hard local snippet if online fails
+
         local_snippets = self.load_local_snippets()
         relevant = [s for s in local_snippets if s.language.lower() == language.lower()]
-        return random.choice(relevant) if relevant else random.choice(local_snippets)
+        if relevant:
+            return random.choice(relevant)
+        return None
