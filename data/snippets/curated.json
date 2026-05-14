@@ -24,12 +24,28 @@
         "tags": ["decorators", "advanced"]
     },
     {
+        "id": "py-dataclass",
+        "language": "python",
+        "title": "Data Class Definition",
+        "code": "from dataclasses import dataclass\nfrom typing import Optional\n\n@dataclass\nclass Config:\n    host: str = \"localhost\"\n    port: int = 8080\n    api_key: Optional[str] = None\n\ndef load_config() -> Config:\n    return Config(port=9000)",
+        "difficulty": "medium",
+        "tags": ["basics", "python"]
+    },
+    {
         "id": "js-async-fetch",
         "language": "javascript",
         "title": "Async Fetch",
         "code": "async function fetchData(url) {\n    try {\n        const response = await fetch(url);\n        const data = await response.json();\n        return data;\n    } catch (error) {\n        console.error(\"Fetch error:\", error);\n    }\n}",
         "difficulty": "medium",
         "tags": ["async", "web", "javascript"]
+    },
+    {
+        "id": "js-arrow-functions",
+        "language": "javascript",
+        "title": "Array Map & Filter",
+        "code": "const items = [{ id: 1, price: 10 }, { id: 2, price: 20 }];\nconst taxRate = 0.05;\n\nconst totalWithTax = items\n    .filter(item => item.price > 0)\n    .map(item => item.price * (1 + taxRate))\n    .reduce((acc, val) => acc + val, 0);\n\nconsole.log(`Total: ${totalWithTax.toFixed(2)}`);",
+        "difficulty": "medium",
+        "tags": ["basics", "javascript"]
     },
     {
         "id": "ts-interface",
@@ -40,12 +56,28 @@
         "tags": ["types", "frontend", "web"]
     },
     {
+        "id": "ts-generics",
+        "language": "typescript",
+        "title": "Generic Repository",
+        "code": "interface Entity { id: string; }\n\nclass Repository<T extends Entity> {\n    private items: T[] = [];\n\n    add(item: T): void {\n        this.items.push(item);\n    }\n\n    findById(id: string): T | undefined {\n        return this.items.find(item => item.id === id);\n    }\n}",
+        "difficulty": "hard",
+        "tags": ["types", "advanced", "typescript"]
+    },
+    {
         "id": "rust-enum",
         "language": "rust",
         "title": "Enum Pattern Matching",
         "code": "enum Message {\n    Quit,\n    Move { x: i32, y: i32 },\n    Write(String),\n}\n\nfn process(msg: Message) {\n    match msg {\n        Message::Quit => println!(\"Quitting\"),\n        Message::Move { x, y } => println!(\"Move to {}, {}\", x, y),\n        Message::Write(s) => println!(\"Message: {}\", s),\n    }\n}",
         "difficulty": "hard",
         "tags": ["rust", "enums", "patterns"]
+    },
+    {
+        "id": "rust-error-handling",
+        "language": "rust",
+        "title": "Result Error Handling",
+        "code": "use std::fs::File;\nuse std::io::{self, Read};\n\nfn read_username_from_file() -> Result<String, io::Error> {\n    let mut f = File::open(\"hello.txt\")?;\n    let mut s = String::new();\n    f.read_to_string(&mut s)?;\n    Ok(s)\n}",
+        "difficulty": "medium",
+        "tags": ["rust", "error-handling"]
     },
     {
         "id": "cpp-template",
@@ -56,12 +88,28 @@
         "tags": ["cpp", "templates"]
     },
     {
+        "id": "cpp-smart-pointers",
+        "language": "cpp",
+        "title": "Unique Pointer",
+        "code": "#include <memory>\n#include <iostream>\n\nstruct Resource {\n    Resource() { std::cout << \"Acquired\\n\"; }\n    ~Resource() { std::cout << \"Released\\n\"; }\n};\n\nint main() {\n    std::unique_ptr<Resource> res = std::make_unique<Resource>();\n    return 0;\n}",
+        "difficulty": "hard",
+        "tags": ["cpp", "modern"]
+    },
+    {
         "id": "go-routine",
         "language": "go",
         "title": "Goroutine Channel",
         "code": "package main\n\nimport \"fmt\"\n\nfunc sum(s []int, c chan int) {\n    sum := 0\n    for _, v := range s {\n        sum += v\n    }\n    c <- sum\n}\n\nfunc main() {\n    s := []int{7, 2, 8, -9, 4, 0}\n    c := make(chan int)\n    go sum(s[:len(s)/2], c)\n    go sum(s[len(s)/2:], c)\n    x, y := <-c, <-c\n    fmt.Println(x, y, x+y)\n}",
         "difficulty": "hard",
         "tags": ["go", "concurrency"]
+    },
+    {
+        "id": "go-http-server",
+        "language": "go",
+        "title": "Basic HTTP Server",
+        "code": "package main\n\nimport (\n    \"fmt\"\n    \"net/http\"\n)\n\nfunc handler(w http.ResponseWriter, r *http.Request) {\n    fmt.Fprintf(w, \"Hi there, I love %s!\", r.URL.Path[1:])\n}\n\nfunc main() {\n    http.HandleFunc(\"/\", handler)\n    http.ListenAndServe(\":8080\", nil)\n}",
+        "difficulty": "medium",
+        "tags": ["go", "web"]
     },
     {
         "id": "sql-select",
@@ -72,11 +120,27 @@
         "tags": ["sql", "database"]
     },
     {
+        "id": "sql-aggregate",
+        "language": "sql",
+        "title": "Group By & Having",
+        "code": "SELECT category, AVG(price) as avg_price, COUNT(*) as count\nFROM products\nGROUP BY category\nHAVING COUNT(*) > 5\nORDER BY avg_price DESC;",
+        "difficulty": "medium",
+        "tags": ["sql", "database"]
+    },
+    {
         "id": "bash-check",
         "language": "bash",
         "title": "File Existence Check",
         "code": "if [ -f \"$FILE\" ]; then\n    echo \"$FILE exists.\"\nelse\n    echo \"$FILE does not exist.\"\nfi",
         "difficulty": "easy",
         "tags": ["bash", "system", "cli"]
+    },
+    {
+        "id": "bash-loops",
+        "language": "bash",
+        "title": "For Loop with Glob",
+        "code": "#!/bin/bash\n\nfor file in *.txt; do\n    if [ -e \"$file\" ]; then\n        echo \"Processing $file...\"\n        mv \"$file\" \"${file%.txt}.bak\"\n    fi\ndone",
+        "difficulty": "medium",
+        "tags": ["bash", "system"]
     }
 ]
