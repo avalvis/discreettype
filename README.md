@@ -14,31 +14,32 @@ A professional, minimal terminal-based typing practice app designed for develope
 - **Discreet "Boss Key":** Press `F12` to instantly mask the app as a professional build log or system utility.
 - **Performance Analytics:** Detailed session summaries with WPM, Accuracy, and historical trend tracking.
 
-## 🛠️ Installation
+## 🛠️ Launching the Tool
 
-Ensure you have **Python 3.12+** and **uv** installed.
+### Smart Launcher (Windows)
+A `run.bat` file is provided in the root directory. This script automatically:
+1. Verifies that `uv` is installed.
+2. Synchronizes your virtual environment and dependencies.
+3. Launches the application in the correct environment.
 
-```bash
-# Clone the repository
-git clone <repo-url>
-cd typing-tool
+Simply **double-click `run.bat`** to start.
 
-# Sync dependencies and set up environment
-uv sync
-```
+### Create a Professional Shortcut
+For the best experience, you can create a desktop shortcut with a custom icon:
+1. **Right-click** `run.bat` and select **Send to > Desktop (create shortcut)**.
+2. **Right-click** the new shortcut on your desktop and select **Properties**.
+3. Under the **Shortcut** tab:
+   - Click **Change Icon...**.
+   - You can choose a professional system icon (e.g., in `shell32.dll` or `imageres.dll`) or point it to a custom `.ico` file.
+   - *Recommendation:* A "terminal" or "code" icon works best for the discreet aesthetic.
 
 ## ⌨️ Usage
 
-Run the application from the project root:
-
-```bash
-uv run python -m typing_tool.main
-```
-
 ### Key Bindings
-- **Enter:** Move to the next line (Auto-skips indentation in IDE Mode).
+- **↑ / ↓ Arrows:** Navigate menus.
+- **Enter:** Confirm selection / Move to next line in session.
 - **Tab:** Progress through indentation blocks.
-- **Backspace:** Correct mistakes (the original character is restored).
+- **Backspace:** Correct mistakes.
 - **F12:** Toggle Discreet Mode (Boss Key).
 - **Ctrl+C:** Gracefully exit the current session or menu.
 
@@ -47,6 +48,7 @@ uv run python -m typing_tool.main
 - `src/typing_tool/main.py`: Main dashboard and multi-session loop.
 - `src/typing_tool/ui/typing.py`: The core "Virtual Overlay" rendering engine and high-contrast theme.
 - `src/typing_tool/ui/app.py`: TUI interaction logic including IDE-assist features.
+- `src/typing_tool/ui/menu.py`: Interactive keyboard-navigable menu system.
 - `src/typing_tool/storage/github_api.py`: Dynamic GitHub search and content fetching.
 - `src/typing_tool/storage/snippets.py`: Multi-source snippet management and categorization.
 
@@ -56,5 +58,6 @@ typing-tool/
 ├── data/snippets/      # Local curated snippet datasets
 ├── src/typing_tool/    # Core application package
 ├── tests/              # Unit tests for session and metrics
-└── pyproject.toml      # Dependency and project configuration
+├── pyproject.toml      # Dependency and project configuration
+└── run.bat            # Smart Windows Launcher
 ```
