@@ -11,6 +11,8 @@ from rich.prompt import Prompt, IntPrompt
 from rich.live import Live
 from rich.spinner import Spinner
 
+from .ui.menu import select_item
+
 def show_main_menu(console: Console, snippet_manager: SnippetManager):
     try:
         console.clear()
@@ -20,25 +22,20 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
         ))
         
         categories = snippet_manager.get_categories()
-        console.print("\n[bold]Select a category:[/bold]")
-        for i, cat in enumerate(categories):
-            console.print(f" [bold cyan]{i+1}.[/bold cyan] {cat}")
-        console.print(" [bold cyan]0.[/bold cyan] Exit")
+        # Add Exit as an option in the interactive menu
+        menu_items = categories + ["Exit"]
         
-        choice = IntPrompt.ask("\nChoice", choices=[str(i) for i in range(len(categories) + 1)])
-        if choice == 0:
+        choice = select_item("Select a category", menu_items)
+        
+        if not choice or choice == "Exit":
             return None
             
-        category = categories[choice - 1]
+        category = choice
         
         if category == "GitHub Explorer":
-            console.print("\n[bold]Select a language to explore:[/bold]")
             languages = ["Python", "TypeScript", "JavaScript", "SQL", "Bash"]
-            for i, lang in enumerate(languages):
-                console.print(f" [bold cyan]{i+1}.[/bold cyan] {lang}")
-                
-            l_choice = IntPrompt.ask("\nChoice", choices=[str(i+1) for i in range(len(languages))])
-            selected_lang = languages[l_choice - 1]
+            selected_lang = select_item("Select a language to explore", languages)
+            if not selected_lang: return None
             
             with Live(Spinner("dots", text=f" Fetching random {selected_lang} snippet from GitHub..."), console=console, transient=True):
                 import random # Needed for fallback
@@ -51,12 +48,10 @@ def show_main_menu(console: Console, snippet_manager: SnippetManager):
 
         # Local categories
         snippets = snippet_manager.get_snippets_by_category(category)
-        console.print(f"\n[bold]Snippets in {category}:[/bold]")
-        for i, s in enumerate(snippets):
-            console.print(f" [bold cyan]{i+1}.[/bold cyan] [{s.language}] {s.title} ({s.difficulty})")
+        labels = [f"[{s.language}] {s.title} ({s.difficulty})" for s in snippets]
         
-        s_choice = IntPrompt.ask("\nSelect snippet", choices=[str(i+1) for i in range(len(snippets))])
-        return snippets[s_choice - 1]
+        selected_snippet = select_item(f"Snippets in {category}", snippets, labels=labels)
+        return selected_snippet
     except (KeyboardInterrupt, EOFError):
         return None
 
@@ -87,11 +82,8 @@ def show_results(console: Console, result, history_manager: HistoryManager):
                 border_style="dim"
             ))
 
-        console.print("\n[bold cyan]1.[/bold cyan] Try Another Snippet")
-        console.print("[bold cyan]2.[/bold cyan] Exit")
-        
-        choice = IntPrompt.ask("\nWhat next?", choices=["1", "2"])
-        return choice == 1
+        choice = select_item("What next?", ["Try Another Snippet", "Exit"])
+        return choice == "Try Another Snippet"
     except (KeyboardInterrupt, EOFError):
         return False
 
@@ -106,17 +98,21 @@ def main():
             break
             
         # Select Interaction Mode
-        console.print("\n[bold]Select Interaction Mode:[/bold]")
-        console.print(" [bold cyan]1.[/bold cyan] Standard (Strict accuracy)")
-        console.print(" [bold cyan]2.[/bold cyan] IDE Mode (Auto-pairs, Indentation assist)")
+        modes = [
+            ("ide", "IDE Mode (Auto-pairs, Indentation assist)"),
+            ("standard", "Standard (Strict accuracy)")
+        ]
         
-        try:
-            m_choice = IntPrompt.ask("\nMode", choices=["1", "2"], default=1)
-            mode = "standard" if m_choice == 1 else "ide"
-        except (KeyboardInterrupt, EOFError):
-            break
+        mode_choice = select_item(
+            "Select Interaction Mode", 
+            [m[0] for m in modes], 
+            labels=[m[1] for m in modes]
+        )
+        
+        if not mode_choice:
+            continue
 
-        app = TypingApp(selected_snippet, mode=mode)
+        app = TypingApp(selected_snippet, mode=mode_choice)
         result = app.run()
         
         if result:

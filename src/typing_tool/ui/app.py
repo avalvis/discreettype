@@ -146,74 +146,18 @@ class TypingApp:
 
         is_sql = self.snippet.language.lower() == "sql"
         
-        # IDE Mode: Flexible Whitespace & Assists
+        # IDE Mode: Flexible Whitespace (Extra user space)
         if self.mode == "ide":
-            # 1. Flexible Whitespace: If user types a space where there isn't one, just ignore it
-            # This handles (a,b) -> (a, b) and a+b -> a + b
             if char in " \t" and self.buffer.cursor_position < len(self.template):
-                target_char = self.template[self.buffer.cursor_position]
-                if target_char not in " \t":
-                    return # Just ignore the extra space
-            
-            # 2. Smart Skip / Flexible Whitespace: 
-            # If we are at whitespace or auto-completed closers, and user types something LATER on the line
-            # This handles (a, b) -> (a,b) and a + b -> a+b
-            while (self.buffer.cursor_position < len(self.template) and 
-                   (self.buffer.cursor_position in self.auto_pairs.values() or 
-                    self.template[self.buffer.cursor_position] in " \t")):
-                
-                # If the character matches what we have here, don't skip
-                target_here = self.template[self.buffer.cursor_position]
-                match_here = (char == target_here)
-                if not match_here and is_sql and char.lower() == target_here.lower():
-                    match_here = True
-                
-                if match_here:
-                    break
-                
-                # Check if 'char' matches something further ahead (on the same line)
-                # This allows skipping through multiple brackets if you type the character AFTER them.
-                found_match_ahead = False
-                for i in range(self.buffer.cursor_position + 1, len(self.template)):
-                    if self.template[i] == "\n": break
-                    
-                    target_ahead = self.template[i]
-                    match_ahead = (target_ahead == char)
-                    if not match_ahead and is_sql and target_ahead.lower() == char.lower():
-                        match_ahead = True
-                        
-                    if match_ahead:
-                        # Skip everything up to this character
-                        self.buffer.cursor_position = i
-                        found_match_ahead = True
-                        break
-                    # We can only skip if the characters we pass are auto-completed closers or whitespace
-                    if not (i in self.auto_pairs.values() or self.template[i] in " \t"):
-                        break
-                
-                if not found_match_ahead:
-                    # Special case for Enter: if we press Enter and there's a newline ahead (only closers/spaces between)
-                    if char == "\n":
-                        for i in range(self.buffer.cursor_position, len(self.template)):
-                            if self.template[i] == "\n":
-                                self.buffer.cursor_position = i
-                                found_match_ahead = True
-                                break
-                            if not (i in self.auto_pairs.values() or self.template[i] in " \t"):
-                                break
-                
-                if not found_match_ahead:
-                    break
+                if self.template[self.buffer.cursor_position] not in " \t":
+                    return 
 
         pos = self.buffer.cursor_position
         if pos >= len(self.template):
             return
 
         target_char = self.template[pos]
-        
         is_correct = (char == target_char)
-        
-        # IDE Mode Improvement: Optional capitalization for SQL
         if not is_correct and self.mode == "ide" and is_sql:
             if char.lower() == target_char.lower():
                 is_correct = True
@@ -226,11 +170,12 @@ class TypingApp:
             self.mistakes[pos] = char
             self.session.errors += 1
         
+        # Advance cursor ONE step
         self.buffer.cursor_position += 1
         
-        # IDE Mode Assists
+        # IDE Mode: Assists (AFTER registration)
         if self.mode == "ide":
-            # 1. Indentation Assist: If we just typed a newline, jump past leading spaces
+            # 1. Newline Indentation Assist
             if char == "\n":
                 new_pos = self.buffer.cursor_position
                 while new_pos < len(self.template) and self.template[new_pos] in " \t":
@@ -238,12 +183,24 @@ class TypingApp:
                 self.buffer.cursor_position = new_pos
             
             # 2. Smart Auto-Pairing
-            elif char in "([{<'\"":
+            elif char in "([{<'\"" and is_correct:
                 opener_pos = pos
                 closer_pos = self.find_matching_closer(opener_pos, char)
                 if closer_pos != -1:
                     self.auto_pairs[opener_pos] = closer_pos
                     self.update_ui_processors()
+
+            # 3. Simple Skip (Template's whitespace/closers)
+            # This logic triggers when we hit a closer or space and want to jump past it.
+            while self.buffer.cursor_position < len(self.template):
+                next_pos = self.buffer.cursor_position
+                next_target = self.template[next_pos]
+                if next_pos in self.auto_pairs.values() and char == next_target:
+                    self.buffer.cursor_position += 1
+                elif next_target in " \t" and char == next_target:
+                     self.buffer.cursor_position += 1
+                else:
+                    break
         
         # Check if done
         if self.buffer.cursor_position >= len(self.template):
