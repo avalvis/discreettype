@@ -357,15 +357,14 @@ class TypingApp:
                 self.session.miskeyed_indices.remove(pos)
             if pos in self.mistakes:
                 del self.mistakes[pos]
+            # Advance cursor ONE step only on accepted input.
+            self.buffer.cursor_position += 1
         else:
             # Mistake!
             if pos not in self.session.miskeyed_indices:
                 self.session.errors += 1
                 self.session.miskeyed_indices.add(pos)
             self.mistakes[pos] = char
-        
-        # Advance cursor ONE step
-        self.buffer.cursor_position += 1
         
         # IDE Mode: Assists (AFTER registration)
         if self.mode == "ide":

@@ -86,7 +86,12 @@ def show_results(console: Console, result, history_manager: HistoryManager):
                 border_style="dim"
             ))
 
-        choice = select_item("What next?", ["Try Another Snippet", "Exit"])
+        choice = select_item(
+            "What next?",
+            ["Try Another Snippet", "Exit"],
+            full_screen=False,
+            erase_when_done=False,
+        )
         return choice == "Try Another Snippet"
     except (KeyboardInterrupt, EOFError):
         return False

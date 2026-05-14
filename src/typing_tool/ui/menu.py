@@ -1,6 +1,6 @@
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import Window, HSplit, VSplit
+from prompt_toolkit.layout.containers import Window, HSplit
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style
@@ -10,11 +10,20 @@ class InteractiveSelector:
     """
     A professional, keyboard-navigable selection menu.
     """
-    def __init__(self, title: str, items: List[Any], labels: Optional[List[str]] = None):
+    def __init__(
+        self,
+        title: str,
+        items: List[Any],
+        labels: Optional[List[str]] = None,
+        full_screen: bool = True,
+        erase_when_done: bool = True,
+    ):
         self.title = title
         self.items = items
         self.labels = labels or [str(i) for i in items]
         self.index = 0
+        self.full_screen = full_screen
+        self.erase_when_done = erase_when_done
         
         self.kb = KeyBindings()
         self.setup_key_bindings()
@@ -62,7 +71,6 @@ class InteractiveSelector:
     def run(self):
         content = FormattedTextControl(self.get_tokens)
         layout = Layout(HSplit([
-            Window(height=1, style="class:item"), # Spacer
             Window(content=content, left_margins=[], right_margins=[])
         ]))
         
@@ -70,12 +78,25 @@ class InteractiveSelector:
             layout=layout,
             key_bindings=self.kb,
             style=self.style,
-            full_screen=False # Don't take over the whole screen for simple menus
+            full_screen=self.full_screen,
+            erase_when_done=self.erase_when_done,
         )
         
         return app.run()
 
-def select_item(title: str, items: List[Any], labels: Optional[List[str]] = None) -> Any:
+def select_item(
+    title: str,
+    items: List[Any],
+    labels: Optional[List[str]] = None,
+    full_screen: bool = True,
+    erase_when_done: bool = True,
+) -> Any:
     """Utility function to run the selector."""
-    selector = InteractiveSelector(title, items, labels)
+    selector = InteractiveSelector(
+        title,
+        items,
+        labels,
+        full_screen=full_screen,
+        erase_when_done=erase_when_done,
+    )
     return selector.run()
